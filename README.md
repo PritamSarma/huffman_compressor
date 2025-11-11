@@ -11,25 +11,25 @@ Supports any file type — text, image, archive, or binary — and provides a re
 
 ## ✨ Features
 
-🧩 ** Binary-Safe Compression ** — works with .txt, .png, .zip, .pdf, .exe, etc.<br>
+🧩 **Binary-Safe Compression** — works with .txt, .png, .zip, .pdf, .exe, etc.<br>
 
-🖱️ ** Drag & Drop GUI ** — simple interface built with TkinterDnD.<br>
+🖱️ **Drag & Drop GUI** — simple interface built with TkinterDnD.<br>
 
-⚙️ ** Configurable Output Folder ** — choose where to save results.<br>
+⚙️ **Configurable Output Folder** — choose where to save results.<br>
 
-🌗 ** Light / Dark Theme toggle. **<br>
+🌗 **Light / Dark Theme toggle**<br>
 
-📊 ** Compression Graph ** — see size reduction visually.<br>
+📊 **Compression Graph** — see size reduction visually.<br>
 
-🚀 ** Real-Time Progress Bar with ETA & speed indicator. **<br>
+🚀 **Real-Time Progress Bar with ETA & speed indicator**<br>
 
-💾 ** Single Executable Build ** — make your own .exe with PyInstaller.<br>
+💾 **Single Executable Build** — make your own .exe with PyInstaller.<br>
 
 ---
 
 ## ⚙️ Installation & Usage (Run via Terminal)
 ### 🪄 Step 1 — Clone the repository
-'git clone https://github.com/<your-username>/huffman-compressor.git
+'git clone https://github.com/PritamSarma/huffman_compressor.git
 cd huffman-compressor'
 
 ### 🪄 Step 2 — Install dependencies
@@ -101,6 +101,7 @@ This project implements Huffman Coding, a fundamental lossless data compression 
 
 
 ![Huffman Compressor GUI](Screenshot.png)
+
 ---
 
 ## 🧾 License
@@ -108,6 +109,7 @@ This project implements Huffman Coding, a fundamental lossless data compression 
 This project is licensed under the MIT License.<br>
 
 Feel free to modify, share, and distribute.<br>
+
 ---
 
 ## ❤️ Credits
