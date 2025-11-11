@@ -18,16 +18,17 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.minsize(600, 420)
         self.resizable(True, True)
 
-        # Ensure terminal returns to normal on close
+        # Exit cleanup (so terminal becomes usable again)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # --- Predefine GUI variables ---
+        # --- State variables ---
         self.graph_canvas = None
         self.result_frame = None
         self.result_text = None
         self.progress_bar = None
+        self.last_graph_data = None  # To redraw graph after theme toggle
 
-        # --- Default theme ---
+        # --- Theme setup ---
         self.theme = "dark"
         self.colors = {
             "dark": {
@@ -66,6 +67,7 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.drop_area.drop_target_register(DND_FILES)
         self.drop_area.dnd_bind("<<Drop>>", self.on_drop)
 
+        # Buttons
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
 
@@ -93,25 +95,22 @@ class HuffmanGUI(TkinterDnD.Tk):
         )
         theme_btn.grid(row=0, column=1, padx=10)
 
-        self.status_label = tk.Label(
-            self,
-            text="Ready.",
-            font=("Consolas", 10),
-        )
+        # Status label
+        self.status_label = tk.Label(self, text="Ready.", font=("Consolas", 10))
         self.status_label.pack(pady=(10, 0))
 
-        # --- Progress Bar ---
+        # Progress bar (fills left to right)
         self.progress_bar = ttk.Progressbar(
             self,
             orient="horizontal",
-            mode="determinate",
+            mode="determinate",  # ✅ determinate: fills from left to right
             length=400,
         )
         self.progress_bar.pack(pady=(5, 15))
         self.progress_bar["maximum"] = 100
         self.progress_bar["value"] = 0
 
-        # --- Result Frame (text + chart) ---
+        # Result section
         self.result_frame = tk.Frame(self)
         self.result_frame.pack(fill="both", expand=True)
 
@@ -137,8 +136,10 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.status_label.configure(bg=c["bg"], fg="lightgreen")
         self.result_frame.configure(bg=c["bg"])
         self.result_text.configure(bg=c["bg"], fg=c["fg"])
+
+        # Update plot if it exists
         if self.graph_canvas:
-            self.update_graph_theme()
+            self.redraw_graph()
 
     def toggle_theme(self):
         self.theme = "light" if self.theme == "dark" else "dark"
@@ -171,61 +172,67 @@ class HuffmanGUI(TkinterDnD.Tk):
             self.status_label.config(text="❌ File not found.")
             return
 
-        # Reset UI
+        # Clear old data
         self.result_text.config(text="")
         if self.graph_canvas:
             self.graph_canvas.get_tk_widget().destroy()
             self.graph_canvas = None
         self.progress_bar["value"] = 0
-        self.update_idletasks()
+        self.last_graph_data = None
 
-        # Determine operation
+        # Determine action
         if file_path.lower().endswith(".txt"):
-            self.run_with_progress(self.compress_file, file_path)
+            self.simulate_progress(lambda: self.compress_file(file_path))
         elif file_path.lower().endswith(".huff"):
-            self.run_with_progress(self.decompress_file, file_path)
+            self.simulate_progress(lambda: self.decompress_file(file_path))
         else:
             self.status_label.config(text="⚠️ Unsupported file type.")
 
     # -------------------
-    # COMPRESSION / DECOMPRESSION WITH PROGRESS
+    # PROGRESS BAR CONTROL
     # -------------------
-    def run_with_progress(self, func, file_path):
-        """Run a function with progress animation"""
-        self.progress_bar["mode"] = "indeterminate"
-        self.progress_bar.start(10)  # speed of animation
-        self.after(100, lambda: func(file_path))
+    def simulate_progress(self, task_func):
+        """Fills the progress bar smoothly while task runs"""
+        self.progress_bar["value"] = 0
+        self.status_label.config(text="Working...")
+        self.update_idletasks()
 
-    def stop_progress(self):
-        self.progress_bar.stop()
-        self.progress_bar["value"] = 100
+        def fill_bar():
+            if self.progress_bar["value"] < 90:
+                self.progress_bar["value"] += 2
+                self.after(20, fill_bar)
+            else:
+                task_func()
+                self.progress_bar["value"] = 100
+                self.update_idletasks()
 
+        fill_bar()
+
+    # -------------------
+    # TASKS
+    # -------------------
     def compress_file(self, file_path):
         try:
             self.status_label.config(text="Compressing...")
             output_path = compress(file_path)
-            self.stop_progress()
             self.show_compression_info(file_path, output_path)
             self.status_label.config(text="✅ Compression complete.")
         except Exception as e:
-            self.stop_progress()
             self.status_label.config(text=f"Error: {e}")
 
     def decompress_file(self, file_path):
         try:
             self.status_label.config(text="Decompressing...")
             output_path = decompress(file_path)
-            self.stop_progress()
             self.result_text.config(
                 text=f"✅ Decompressed successfully!\nSaved to:\n{output_path}"
             )
             self.status_label.config(text="✅ Decompression complete.")
         except Exception as e:
-            self.stop_progress()
             self.status_label.config(text=f"Error: {e}")
 
     # -------------------
-    # INFO + GRAPH
+    # GRAPH + INFO DISPLAY
     # -------------------
     def show_compression_info(self, original_path, compressed_path):
         original_size = os.path.getsize(original_path)
@@ -239,10 +246,20 @@ class HuffmanGUI(TkinterDnD.Tk):
             f"Saved: {ratio:.2f}%\n\nOutput File:\n{compressed_path}"
         )
         self.result_text.config(text=info)
-        self.show_compression_graph(original_size, compressed_size, ratio)
+        self.last_graph_data = (original_size, compressed_size, ratio)
+        self.redraw_graph()
 
-    def show_compression_graph(self, original_size, compressed_size, ratio):
+    def redraw_graph(self):
+        """Draw or redraw the graph using the current theme and stored data"""
+        if not self.last_graph_data:
+            return
+
+        original_size, compressed_size, ratio = self.last_graph_data
         colors = self.colors[self.theme]
+
+        if self.graph_canvas:
+            self.graph_canvas.get_tk_widget().destroy()
+
         fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
         ax.bar(["Original", "Compressed"], [original_size, compressed_size],
                color=["#5B8BF7", "#F15A5A"])
@@ -261,16 +278,11 @@ class HuffmanGUI(TkinterDnD.Tk):
         widget.configure(bg=colors["bg"], highlightthickness=0)
         widget.pack(pady=5)
 
-    def update_graph_theme(self):
-        if self.graph_canvas:
-            self.graph_canvas.get_tk_widget().destroy()
-            self.graph_canvas = None
-
     # -------------------
-    # SAFE EXIT HANDLER
+    # CLEAN EXIT
     # -------------------
     def on_close(self):
-        """Safely exit the app and restore terminal"""
+        """Ensure GUI closes cleanly and returns terminal"""
         try:
             self.destroy()
             self.quit()
