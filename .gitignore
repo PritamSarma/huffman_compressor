@@ -1,0 +1,16 @@
+# Python cache and build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build/
+output/
+dist/
+*.egg-info/
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
