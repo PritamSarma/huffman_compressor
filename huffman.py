@@ -1,7 +1,7 @@
 import heapq
 from collections import Counter
 
-# Node class for Huffman Tree
+# Node for Huffman Tree
 class Node:
     def __init__(self, char, freq):
         self.char = char
@@ -13,7 +13,6 @@ class Node:
         return self.freq < other.freq
 
 
-# Build Huffman Tree from text
 def build_tree(text):
     freq = Counter(text)
     heap = [Node(ch, fr) for ch, fr in freq.items()]
@@ -30,7 +29,6 @@ def build_tree(text):
     return heap[0]
 
 
-# Generate Huffman codes
 def build_codes(root):
     codes = {}
 
@@ -46,12 +44,10 @@ def build_codes(root):
     return codes
 
 
-# Encode text to binary string
 def encode_text(text, codes):
     return ''.join(codes[ch] for ch in text)
 
 
-# Decode binary string using Huffman tree
 def decode_text(encoded_text, root):
     decoded = []
     node = root
@@ -61,3 +57,21 @@ def decode_text(encoded_text, root):
             decoded.append(node.char)
             node = root
     return ''.join(decoded)
+
+
+# New: rebuild tree from code dictionary
+def rebuild_tree_from_codes(codes):
+    root = Node(None, 0)
+    for char, code in codes.items():
+        node = root
+        for bit in code:
+            if bit == '0':
+                if not node.left:
+                    node.left = Node(None, 0)
+                node = node.left
+            else:
+                if not node.right:
+                    node.right = Node(None, 0)
+                node = node.right
+        node.char = char
+    return root

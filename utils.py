@@ -1,3 +1,5 @@
+import json
+
 def pad_encoded_text(encoded_text):
     extra_padding = 8 - len(encoded_text) % 8
     for _ in range(extra_padding):
@@ -46,3 +48,17 @@ def read_binary_file(file_path):
 def write_text_file(file_path, text):
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(text)
+
+
+# New: save and load Huffman code table
+def save_metadata(file_path, codes):
+    meta_path = file_path + ".meta"
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(codes, f)
+    return meta_path
+
+
+def load_metadata(file_path):
+    meta_path = file_path + ".meta"
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
