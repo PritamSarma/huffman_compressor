@@ -30,7 +30,7 @@ Supports any file type — text, image, archive, or binary — and provides a re
 
 ## ⚙️ Installation & Usage (Run via Terminal)
 ### 🪄 Step 1 — Clone the repository
-git clone https://github.com/PritamSarma/huffman_compressor.git
+git clone https://github.com/PritamSarma/huffman_compressor.git<br>
 cd huffman-compressor
 
 ### 🪄 Step 2 — Install dependencies
