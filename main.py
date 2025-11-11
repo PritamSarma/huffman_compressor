@@ -1,164 +1,164 @@
+# main.py
 import os
-from huffman import build_tree, build_codes, rebuild_tree_from_codes
+from huffman import build_tree, build_codes, rebuild_tree_from_codes, decode_bits_to_bytes
 from utils import (
-    read_file, write_binary_file, write_text_file, read_binary_file,
+    read_file_bytes, write_binary_file, write_text_file, read_binary_file_bits,
     pad_encoded_text, remove_padding, get_byte_array,
     save_metadata, load_metadata
 )
 
-OUTPUT_DIR = "output"
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
+OUTPUT_DIR_DEFAULT = "output"
+os.makedirs(OUTPUT_DIR_DEFAULT, exist_ok=True)
 
 
-def compress(file_path, progress_callback=None):
+def compress(file_path, output_dir=OUTPUT_DIR_DEFAULT, progress_callback=None):
     """
-    Compress a text file using Huffman coding.
-    Updates progress_callback(percent) during the process.
+    Compress any file (binary-safe) using Huffman coding.
+    progress_callback(percent) optional, percent in 0..100
     """
+    os.makedirs(output_dir, exist_ok=True)
 
-    # --- Step 1: Read input file ---
-    text = read_file(file_path)
-    total_len = len(text)
-    original_size = os.path.getsize(file_path)
+    data = read_file_bytes(file_path)
+    total_len = len(data)
+    if total_len == 0:
+        raise ValueError("File is empty.")
 
     if progress_callback:
         progress_callback(2)
 
-    # --- Step 2: Build Huffman Tree and Codes ---
-    root = build_tree(text)
+    # build tree & codes
+    root = build_tree(data)
     codes = build_codes(root)
 
     if progress_callback:
         progress_callback(5)
 
-    # --- Step 3: Encode Text ---
-    encoded_text = []
-    last_percent = 0
-    for i, ch in enumerate(text):
-        encoded_text.append(codes[ch])
-        if progress_callback and i % max(1, total_len // 90) == 0:
-            percent = 5 + (i / total_len) * 75  # 5% → 80%
+    # encode bytes -> bitstring
+    encoded_parts = []
+    last_percent = 5
+    # choose step to update roughly 1% increments
+    step = max(1, total_len // 80)
+    for i, b in enumerate(data):
+        encoded_parts.append(codes[b])
+        if progress_callback and (i % step == 0):
+            percent = 5 + (i / total_len) * 75  # range 5..80
             if percent - last_percent >= 1:
                 progress_callback(percent)
                 last_percent = percent
 
-    encoded_text = "".join(encoded_text)
+    encoded_text = "".join(encoded_parts)
 
     if progress_callback:
         progress_callback(82)
 
-    # --- Step 4: Pad encoded text & convert to bytes ---
-    padded_text = pad_encoded_text(encoded_text)
-    byte_array = get_byte_array(padded_text)
+    # pad and convert to bytes
+    padded = pad_encoded_text(encoded_text)
+    byte_array = get_byte_array(padded)
 
     if progress_callback:
         progress_callback(90)
 
-    # --- Step 5: Save compressed file & metadata ---
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
-    output_path = os.path.join(OUTPUT_DIR, base_name + ".huff")
-    write_binary_file(output_path, bytes(byte_array))
-    save_metadata(output_path, codes)
-
-    if progress_callback:
-        progress_callback(97)
-
-    # --- Step 6: Finalize ---
-    compressed_size = os.path.getsize(output_path)
-    ratio = (1 - compressed_size / original_size) * 100
+    base_name = os.path.basename(file_path)
+    out_path = os.path.join(output_dir, base_name + ".huff")
+    write_binary_file(out_path, byte_array)
+    save_metadata(out_path, codes)
 
     if progress_callback:
         progress_callback(100)
 
-    print("✅ Compression complete:")
-    print(f"   Input File: {file_path}")
-    print(f"   Output File: {output_path}")
-    print(f"   Original Size: {original_size / 1024:.2f} KB")
-    print(f"   Compressed Size: {compressed_size / 1024:.2f} KB")
-    print(f"   Space Saved: {ratio:.2f}%")
+    compressed_size = os.path.getsize(out_path)
+    original_size = os.path.getsize(file_path)
+    ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0.0
 
-    return output_path
+    print(f"✅ Compressed {file_path} → {out_path}")
+    print(f"   Original: {original_size} bytes, Compressed: {compressed_size} bytes, Saved: {ratio:.2f}%")
+    return out_path
 
 
-def decompress(file_path, progress_callback=None):
+def decompress(file_path, output_dir=OUTPUT_DIR_DEFAULT, progress_callback=None):
     """
-    Decompress a .huff file using Huffman coding.
-    Updates progress_callback(percent) during the process.
+    Decompress .huff file created by this tool.
+    Returns path to decompressed file (binary-safe).
     """
+    os.makedirs(output_dir, exist_ok=True)
 
-    # --- Step 1: Read compressed binary data ---
-    bit_string = read_binary_file(file_path)
+    # Step 1: Read compressed binary file as bits
+    bit_string = read_binary_file_bits(file_path)
     total_bits = len(bit_string)
+    if total_bits == 0:
+        raise ValueError("Compressed file is empty.")
 
     if progress_callback:
         progress_callback(10)
 
-    # --- Step 2: Remove padding ---
-    encoded_text = remove_padding(bit_string)
+    # Step 2: Remove padding
+    encoded_bits = remove_padding(bit_string)
 
     if progress_callback:
         progress_callback(25)
 
-    # --- Step 3: Load Huffman codes ---
+    # Step 3: Load Huffman codes and rebuild tree
     codes = load_metadata(file_path)
     root = rebuild_tree_from_codes(codes)
 
     if progress_callback:
         progress_callback(35)
 
-    # --- Step 4: Decode text ---
-    decoded_chars = []
+    # Step 4: Decode bits to bytes
+    decoded = bytearray()
     node = root
     last_percent = 35
-    for i, bit in enumerate(encoded_text):
+    total_encoded_bits = len(encoded_bits)
+    step = max(1, total_encoded_bits // 60) if total_encoded_bits > 0 else 1
+
+    for i, bit in enumerate(encoded_bits):
         node = node.left if bit == '0' else node.right
-        if node.char:
-            decoded_chars.append(node.char)
+        if node.char is not None:
+            decoded.append(node.char)
             node = root
-        if progress_callback and i % max(1, total_bits // 60) == 0:
-            percent = 35 + (i / total_bits) * 60  # up to 95%
+        if progress_callback and (i % step == 0):
+            percent = 35 + (i / max(1, total_encoded_bits)) * 60
             if percent - last_percent >= 1:
                 progress_callback(percent)
                 last_percent = percent
 
     if progress_callback:
-        progress_callback(97)
+        progress_callback(95)
 
-    decoded_text = "".join(decoded_chars)
+    # Step 5: Construct output filename
+    base_name = os.path.basename(file_path)
+    if base_name.endswith(".huff"):
+        base_name = base_name[:-5]
 
-    # --- Step 5: Write decompressed file ---
-    output_path = os.path.join(
-        OUTPUT_DIR, os.path.basename(file_path).split(".")[0] + "_out.txt"
-    )
-    write_text_file(output_path, decoded_text)
+    # Insert "_out" before extension (e.g., data.txt → data_out.txt)
+    name_part, ext_part = os.path.splitext(base_name)
+    out_path = os.path.join(output_dir, f"{name_part}_out{ext_part}")
+
+    # Step 6: Write decompressed file
+    write_binary_file(out_path, bytes(decoded))
 
     if progress_callback:
         progress_callback(100)
 
-    print("✅ Decompression complete:")
-    print(f"   Input File: {file_path}")
-    print(f"   Output File: {output_path}")
-
-    return output_path
+    print(f"✅ Decompressed {file_path} → {out_path}")
+    return out_path
 
 
-# --- CLI Entry Point ---
+
+# CLI entrypoint
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) < 3:
-        print("Usage:")
-        print("  python main.py compress <input_file>")
-        print("  python main.py decompress <input_file>")
+        print("Usage: python main.py compress <file> OR python main.py decompress <file>")
         sys.exit(1)
 
     mode = sys.argv[1].lower()
-    file_path = sys.argv[2]
+    path = sys.argv[2]
 
     if mode == "compress":
-        compress(file_path)
+        compress(path)
     elif mode == "decompress":
-        decompress(file_path)
+        decompress(path)
     else:
         print("Invalid mode. Use 'compress' or 'decompress'.")
