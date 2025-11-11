@@ -1,7 +1,9 @@
 import os
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import filedialog
 from tkinterdnd2 import DND_FILES, TkinterDnD
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 from main import compress, decompress
 
 
@@ -11,10 +13,11 @@ class HuffmanGUI(TkinterDnD.Tk):
 
         # --- Window setup ---
         self.title("🗜️ Huffman File Compressor")
-        self.geometry("520x360")
-        self.resizable(False, False)
+        self.geometry("700x500")
+        self.minsize(600, 400)  # allow resize
+        self.resizable(True, True)
 
-        # --- Default theme: Dark ---
+        # --- Default theme ---
         self.theme = "dark"
         self.colors = {
             "dark": {"bg": "#1E1E1E", "fg": "white", "box": "#2D2D2D", "accent": "#007ACC"},
@@ -26,7 +29,7 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.title_label = tk.Label(
             self,
             text="🗜️ Huffman File Compressor",
-            font=("Segoe UI", 16, "bold"),
+            font=("Segoe UI", 18, "bold"),
             fg=self.colors[self.theme]["fg"],
             bg=self.colors[self.theme]["bg"],
         )
@@ -37,22 +40,20 @@ class HuffmanGUI(TkinterDnD.Tk):
             self,
             text="\n\nDrag & Drop your file here\n(.txt to compress or .huff to decompress)\n\n",
             relief="ridge",
-            width=50,
+            width=60,
             height=8,
             bg=self.colors[self.theme]["box"],
             fg=self.colors[self.theme]["fg"],
             font=("Segoe UI", 11),
         )
-        self.drop_area.pack(pady=10)
-
+        self.drop_area.pack(pady=10, fill="x", padx=40, expand=False)
         self.drop_area.drop_target_register(DND_FILES)
         self.drop_area.dnd_bind("<<Drop>>", self.on_drop)
 
-        # --- Buttons Frame ---
+        # --- Buttons ---
         btn_frame = tk.Frame(self, bg=self.colors[self.theme]["bg"])
         btn_frame.pack(pady=10)
 
-        # Choose File Button
         choose_btn = tk.Button(
             btn_frame,
             text="📂 Choose File",
@@ -63,11 +64,10 @@ class HuffmanGUI(TkinterDnD.Tk):
             relief="flat",
             padx=15,
             pady=5,
-            cursor="hand2"
+            cursor="hand2",
         )
         choose_btn.grid(row=0, column=0, padx=10)
 
-        # Theme Toggle Button
         theme_btn = tk.Button(
             btn_frame,
             text="🌙 Toggle Theme",
@@ -78,7 +78,7 @@ class HuffmanGUI(TkinterDnD.Tk):
             relief="flat",
             padx=10,
             pady=5,
-            cursor="hand2"
+            cursor="hand2",
         )
         theme_btn.grid(row=0, column=1, padx=10)
 
@@ -92,7 +92,26 @@ class HuffmanGUI(TkinterDnD.Tk):
         )
         self.status_label.pack(pady=10)
 
-    # --- Theme Control ---
+        # --- Result Frame ---
+        self.result_frame = tk.Frame(self, bg=self.colors[self.theme]["bg"])
+        self.result_frame.pack(fill="both", expand=True)
+
+        self.result_text = tk.Label(
+            self.result_frame,
+            text="",
+            justify="left",
+            fg=self.colors[self.theme]["fg"],
+            bg=self.colors[self.theme]["bg"],
+            font=("Consolas", 11),
+        )
+        self.result_text.pack(pady=10)
+
+        # --- Graph Area (matplotlib canvas) ---
+        self.graph_canvas = None
+
+    # -------------------
+    # THEME MANAGEMENT
+    # -------------------
     def apply_theme(self):
         c = self.colors[self.theme]
         self.configure(bg=c["bg"])
@@ -102,15 +121,17 @@ class HuffmanGUI(TkinterDnD.Tk):
             self.title_label.configure(bg=c["bg"], fg=c["fg"])
         if hasattr(self, "status_label"):
             self.status_label.configure(bg=c["bg"], fg="lightgreen")
+        if hasattr(self, "result_text"):
+            self.result_text.configure(bg=c["bg"], fg=c["fg"])
 
     def toggle_theme(self):
         self.theme = "light" if self.theme == "dark" else "dark"
         self.apply_theme()
-        self.status_label.config(
-            text=f"Theme changed to {self.theme.capitalize()} Mode."
-        )
+        self.status_label.config(text=f"Theme changed to {self.theme.capitalize()} Mode.")
 
-    # --- File Handling ---
+    # -------------------
+    # FILE HANDLING
+    # -------------------
     def choose_file(self):
         file_path = filedialog.askopenfilename(
             title="Select File",
@@ -125,38 +146,66 @@ class HuffmanGUI(TkinterDnD.Tk):
 
     def handle_file(self, file_path):
         if not os.path.exists(file_path):
-            messagebox.showerror("Error", "File not found.")
+            self.status_label.config(text="❌ File not found.")
             return
+
+        # Clear previous result & chart
+        self.result_text.config(text="")
+        if self.graph_canvas:
+            self.graph_canvas.get_tk_widget().destroy()
+            self.graph_canvas = None
 
         if file_path.lower().endswith(".txt"):
             self.status_label.config(text="Compressing...")
             self.update_idletasks()
             try:
                 output_path = compress(file_path)
-                messagebox.showinfo(
-                    "Success",
-                    f"✅ Compressed successfully!\n\nSaved to:\n{output_path}",
-                )
-                self.status_label.config(text="Compression complete.")
+                self.show_compression_info(file_path, output_path)
+                self.status_label.config(text="✅ Compression complete.")
             except Exception as e:
-                messagebox.showerror("Error", f"Compression failed:\n{e}")
-                self.status_label.config(text="Error.")
+                self.status_label.config(text=f"Error: {e}")
         elif file_path.lower().endswith(".huff"):
             self.status_label.config(text="Decompressing...")
             self.update_idletasks()
             try:
                 output_path = decompress(file_path)
-                messagebox.showinfo(
-                    "Success",
-                    f"✅ Decompressed successfully!\n\nSaved to:\n{output_path}",
-                )
-                self.status_label.config(text="Decompression complete.")
+                self.result_text.config(text=f"✅ Decompressed successfully!\nSaved to:\n{output_path}")
+                self.status_label.config(text="✅ Decompression complete.")
             except Exception as e:
-                messagebox.showerror("Error", f"Decompression failed:\n{e}")
-                self.status_label.config(text="Error.")
+                self.status_label.config(text=f"Error: {e}")
         else:
-            messagebox.showwarning("Unsupported", "Please drop a .txt or .huff file.")
-            self.status_label.config(text="Unsupported file type.")
+            self.status_label.config(text="⚠️ Unsupported file type.")
+
+    # -------------------
+    # DISPLAY COMPRESSION STATS + GRAPH
+    # -------------------
+    def show_compression_info(self, original_path, compressed_path):
+        original_size = os.path.getsize(original_path)
+        compressed_size = os.path.getsize(compressed_path)
+        ratio = (1 - compressed_size / original_size) * 100
+
+        info = (
+            f"✅ Compression complete\n"
+            f"Original: {original_size / 1024:.2f} KB\n"
+            f"Compressed: {compressed_size / 1024:.2f} KB\n"
+            f"Saved: {ratio:.2f}%\n\nOutput File:\n{compressed_path}"
+        )
+        self.result_text.config(text=info)
+
+        # --- Embed graph inside GUI ---
+        self.show_compression_graph(original_size, compressed_size, ratio)
+
+    def show_compression_graph(self, original_size, compressed_size, ratio):
+        fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
+        ax.bar(["Original", "Compressed"], [original_size, compressed_size], color=["#5B8BF7", "#F15A5A"])
+        ax.set_ylabel("File Size (bytes)")
+        ax.set_title(f"Compression Ratio: {ratio:.2f}% Saved")
+        plt.tight_layout()
+
+        self.graph_canvas = FigureCanvasTkAgg(fig, master=self.result_frame)
+        self.graph_canvas.draw()
+        widget = self.graph_canvas.get_tk_widget()
+        widget.pack(pady=5)
 
 
 if __name__ == "__main__":

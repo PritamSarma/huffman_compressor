@@ -78,7 +78,7 @@ def show_compression_report(original_size, compressed_size, ratio, file_path):
     plt.ylabel("File Size (bytes)")
     plt.title(f"Compression Report for '{os.path.basename(file_path)}'")
     plt.tight_layout()
-    plt.show()
+    #plt.show()
 
 
 if __name__ == "__main__":
