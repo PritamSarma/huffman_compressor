@@ -1,5 +1,7 @@
-Huffman Compressor tool used in compressing files like .txt, jpeg, mp3
+Huffman Compressor tool used in compressing .txt files
 
-Project in development. Will share more details after project takes shape.
+This is a terminal version of the compressor tool.
+To compress: python main.py compress test.py
+To decompress: python main.py decompress test.huff
 
-First using python for learning, then port to c++ for speed and then maybe java for distribution or desktop tool/app.
+Please use the gui version branch for better experience
