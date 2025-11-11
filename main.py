@@ -1,5 +1,6 @@
 import sys
 import os
+import matplotlib.pyplot as plt
 from huffman import (
     build_tree, build_codes, encode_text, decode_text, rebuild_tree_from_codes
 )
@@ -17,6 +18,7 @@ if not os.path.exists(OUTPUT_DIR):
 def compress(file_path):
     print(f"🔹 Reading {file_path} ...")
     text = read_file(file_path)
+    original_size = os.path.getsize(file_path)
 
     print("🔹 Building Huffman Tree ...")
     root = build_tree(text)
@@ -32,11 +34,14 @@ def compress(file_path):
     meta_path = save_metadata(output_path, codes)
 
     write_binary_file(output_path, bytes(byte_array))
-    ratio = (1 - len(byte_array) / len(text.encode('utf-8'))) * 100
+    compressed_size = os.path.getsize(output_path)
+    ratio = (1 - compressed_size / original_size) * 100
 
     print(f"✅ Compressed successfully → {output_path}")
     print(f"🧾 Metadata saved → {meta_path}")
     print(f"📉 Compression ratio: {ratio:.2f}%")
+
+    show_compression_report(original_size, compressed_size, ratio, file_path)
     return output_path
 
 
@@ -58,6 +63,22 @@ def decompress(file_path):
     write_text_file(output_path, decoded_text)
     print(f"✅ Decompressed successfully → {output_path}")
     return output_path
+
+
+def show_compression_report(original_size, compressed_size, ratio, file_path):
+    """Display compression summary and a visual chart"""
+    print("\n📊 COMPRESSION REPORT")
+    print(f"   Original file size  : {original_size / 1024:.2f} KB")
+    print(f"   Compressed file size: {compressed_size / 1024:.2f} KB")
+    print(f"   Space saved         : {ratio:.2f}%")
+
+    # Bar chart
+    plt.figure(figsize=(5, 4))
+    plt.bar(["Original", "Compressed"], [original_size, compressed_size])
+    plt.ylabel("File Size (bytes)")
+    plt.title(f"Compression Report for '{os.path.basename(file_path)}'")
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
