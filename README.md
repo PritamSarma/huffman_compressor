@@ -7,6 +7,7 @@
 
 <p allign="center">A modern, GUI-based Huffman coding application for file compression and decompression.
 Supports any file type — text, image, archive, or binary — and provides a real-time progress bar, ETA, speed, and compression ratio graph.</p>
+
 ---
 
 ## ✨ Features
@@ -29,14 +30,14 @@ Supports any file type — text, image, archive, or binary — and provides a re
 
 ## ⚙️ Installation & Usage (Run via Terminal)
 ### 🪄 Step 1 — Clone the repository
-'git clone https://github.com/PritamSarma/huffman_compressor.git
-cd huffman-compressor'
+git clone https://github.com/PritamSarma/huffman_compressor.git
+cd huffman-compressor
 
 ### 🪄 Step 2 — Install dependencies
-'pip install -r requirements.txt'
+pip install -r requirements.txt
 
 ### 🪄 Step 3 — Run the GUI
-'python gui.py'
+python gui.py
 
 
 That’s it! 🎉<br>
@@ -64,10 +65,10 @@ python gui.py<br>
 You can bundle this app into a single Windows executable that runs without Python.
 
 ### Step 1 — Install PyInstaller
-'pip install pyinstaller'
+pip install pyinstaller
 
 ### Step 2 — Build the executable
-'pyinstaller --noconsole --onefile --icon=icon.ico gui.py'
+pyinstaller --noconsole --onefile --icon=icon.ico gui.py
 
 
 ### ✅ This creates:
