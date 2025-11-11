@@ -24,6 +24,7 @@ Supports any file type — text, image, archive, or binary — and provides a re
 🚀 ** Real-Time Progress Bar with ETA & speed indicator. **<br>
 
 💾 ** Single Executable Build ** — make your own .exe with PyInstaller.<br>
+
 ---
 
 ## ⚙️ Installation & Usage (Run via Terminal)
@@ -40,6 +41,7 @@ cd huffman-compressor'
 
 That’s it! 🎉<br>
 The graphical interface will launch — just drag & drop any file or choose it manually.
+
 ---
 ## 🪄 Example Run
 ### 🧱 Compress a file:
@@ -54,7 +56,9 @@ python gui.py<br>
 
 → Drag photo.huff<br>
 → Restores as photo_out.png<br>
+
 ---
+
 ## ⚡ Building a Standalone .exe (Optional)
 
 You can bundle this app into a single Windows executable that runs without Python.
@@ -71,8 +75,10 @@ You can bundle this app into a single Windows executable that runs without Pytho
 dist/gui.exe
 
 
-Double-click it — the full app launches instantly with no terminal window.
+Double-click it — the full app launches instantly with no terminal window.<br>
+
 ---
+
 ## 🧩 Supported File Types
 | Type | Example |
 |------|---------|
@@ -84,25 +90,28 @@ Double-click it — the full app launches instantly with no terminal window.
 | Audio |	.mp3, .wav |
 
 ✅ Works with any binary data.
+
 ---
-## 🧠 Algorithm Used
+## 🧠 Algorithm Used <br>
 
 This project implements Huffman Coding, a fundamental lossless data compression algorithm that assigns shorter codes to frequent bytes and longer codes to rare ones, minimizing total file size.
+
 ---
 ## 📸 Screenshot
 
 
 ![Huffman Compressor GUI](Screenshot.png)
 ---
+
 ## 🧾 License
 
 This project is licensed under the MIT License.<br>
 
 Feel free to modify, share, and distribute.<br>
 ---
+
 ## ❤️ Credits
 
 Developed by Pritam Sarma<br>
 If you like this project, ⭐ star it on GitHub<br>
  — it helps a lot!
----
