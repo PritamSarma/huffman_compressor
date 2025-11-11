@@ -1,5 +1,5 @@
 import os
-import sys
+import time
 import tkinter as tk
 from tkinter import filedialog, ttk
 from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -14,11 +14,11 @@ class HuffmanGUI(TkinterDnD.Tk):
 
         # --- Window setup ---
         self.title("🗜️ Huffman File Compressor")
-        self.geometry("700x540")
-        self.minsize(600, 440)
+        self.geometry("780x600")
+        self.minsize(680, 480)
         self.resizable(True, True)
 
-        # Exit cleanup so terminal becomes free after close
+        # Ensure terminal returns to normal on close
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # --- State variables ---
@@ -26,7 +26,11 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.result_frame = None
         self.result_text = None
         self.progress_bar = None
-        self.last_graph_data = None  # stores last chart for redrawing on theme switch
+        self.last_graph_data = None
+
+        # Progress timing
+        self._progress_start_time = None
+        self._progress_total_size = None  # bytes
 
         # --- Theme setup ---
         self.theme = "dark"
@@ -53,23 +57,24 @@ class HuffmanGUI(TkinterDnD.Tk):
             text="🗜️ Huffman File Compressor",
             font=("Segoe UI", 18, "bold"),
         )
-        self.title_label.pack(pady=20)
+        self.title_label.pack(pady=18)
 
+        # Drop area
         self.drop_area = tk.Label(
             self,
             text="\n\nDrag & Drop your file here\n(.txt to compress or .huff to decompress)\n\n",
             relief="ridge",
-            width=60,
+            width=80,
             height=8,
             font=("Segoe UI", 11),
         )
-        self.drop_area.pack(pady=10, fill="x", padx=40, expand=False)
+        self.drop_area.pack(pady=8, fill="x", padx=40, expand=False)
         self.drop_area.drop_target_register(DND_FILES)
         self.drop_area.dnd_bind("<<Drop>>", self.on_drop)
 
         # Buttons
         btn_frame = tk.Frame(self)
-        btn_frame.pack(pady=10)
+        btn_frame.pack(pady=8)
 
         choose_btn = tk.Button(
             btn_frame,
@@ -77,11 +82,11 @@ class HuffmanGUI(TkinterDnD.Tk):
             command=self.choose_file,
             font=("Segoe UI", 10, "bold"),
             relief="flat",
-            padx=15,
-            pady=5,
+            padx=14,
+            pady=6,
             cursor="hand2",
         )
-        choose_btn.grid(row=0, column=0, padx=10)
+        choose_btn.grid(row=0, column=0, padx=8)
 
         theme_btn = tk.Button(
             btn_frame,
@@ -90,29 +95,44 @@ class HuffmanGUI(TkinterDnD.Tk):
             font=("Segoe UI", 10),
             relief="flat",
             padx=10,
-            pady=5,
+            pady=6,
             cursor="hand2",
         )
-        theme_btn.grid(row=0, column=1, padx=10)
+        theme_btn.grid(row=0, column=1, padx=8)
 
         # Status label
         self.status_label = tk.Label(self, text="Ready.", font=("Consolas", 10))
-        self.status_label.pack(pady=(10, 0))
+        self.status_label.pack(pady=(8, 4))
 
-        # Progress bar (real progress — fills left to right)
+        # --- Progress area with ETA & speed ---
+        prog_frame = tk.Frame(self)
+        prog_frame.pack(pady=(4, 10))
+
         self.progress_bar = ttk.Progressbar(
-            self,
+            prog_frame,
             orient="horizontal",
             mode="determinate",
-            length=400,
+            length=520,
         )
-        self.progress_bar.pack(pady=(5, 15))
+        self.progress_bar.grid(row=0, column=0, padx=8, pady=2)
+
+        info_frame = tk.Frame(prog_frame)
+        info_frame.grid(row=0, column=1, padx=(10, 0), sticky="n")
+
+        # Speed label (KB/s)
+        self.speed_label = tk.Label(info_frame, text="Speed: - KB/s", font=("Consolas", 9))
+        self.speed_label.pack(anchor="w")
+
+        # ETA label
+        self.eta_label = tk.Label(info_frame, text="ETA: --:--", font=("Consolas", 9))
+        self.eta_label.pack(anchor="w")
+
         self.progress_bar["maximum"] = 100
         self.progress_bar["value"] = 0
 
-        # Result section
+        # Result / graph area
         self.result_frame = tk.Frame(self)
-        self.result_frame.pack(fill="both", expand=True)
+        self.result_frame.pack(fill="both", expand=True, padx=8, pady=6)
 
         self.result_text = tk.Label(
             self.result_frame,
@@ -120,9 +140,9 @@ class HuffmanGUI(TkinterDnD.Tk):
             justify="left",
             font=("Consolas", 11),
         )
-        self.result_text.pack(pady=10)
+        self.result_text.pack(pady=8)
 
-        # Apply theme after everything exists
+        # Apply theme
         self.apply_theme()
 
     # -------------------
@@ -136,16 +156,16 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.status_label.configure(bg=c["bg"], fg="lightgreen")
         self.result_frame.configure(bg=c["bg"])
         self.result_text.configure(bg=c["bg"], fg=c["fg"])
-
+        self.speed_label.configure(bg=c["bg"], fg=c["fg"])
+        self.eta_label.configure(bg=c["bg"], fg=c["fg"])
+        # update graph if present
         if self.graph_canvas:
-            self.redraw_graph()  # refresh chart with new colors
+            self.redraw_graph()
 
     def toggle_theme(self):
         self.theme = "light" if self.theme == "dark" else "dark"
         self.apply_theme()
-        self.status_label.config(
-            text=f"Theme changed to {self.theme.capitalize()} Mode."
-        )
+        self.status_label.config(text=f"Theme changed to {self.theme.capitalize()} Mode.")
 
     # -------------------
     # FILE HANDLING
@@ -171,21 +191,79 @@ class HuffmanGUI(TkinterDnD.Tk):
             self.status_label.config(text="❌ File not found.")
             return
 
-        # Clear previous output
+        # Reset UI
         self.result_text.config(text="")
         if self.graph_canvas:
             self.graph_canvas.get_tk_widget().destroy()
             self.graph_canvas = None
         self.progress_bar["value"] = 0
+        self.speed_label.config(text="Speed: - KB/s")
+        self.eta_label.config(text="ETA: --:--")
         self.last_graph_data = None
+        self._progress_start_time = None
+        self._progress_total_size = None
 
-        # Determine mode
         if file_path.lower().endswith(".txt"):
+            # compression: use original file size as total
+            total = os.path.getsize(file_path)
+            self._progress_total_size = total
             self.compress_file(file_path)
         elif file_path.lower().endswith(".huff"):
+            # decompression: use compressed file size as total (approx)
+            total = os.path.getsize(file_path)
+            self._progress_total_size = total
             self.decompress_file(file_path)
         else:
             self.status_label.config(text="⚠️ Unsupported file type.")
+
+    # -------------------
+    # PROGRESS HELPERS
+    # -------------------
+    def _start_progress_timer(self):
+        self._progress_start_time = time.time()
+
+    def _update_progress_ui(self, percent):
+        """Update progress bar and compute speed/ETA using total size."""
+        # percent: 0..100
+        if self._progress_start_time is None:
+            self._start_progress_timer()
+
+        # clamp percent
+        p = max(0.0, min(100.0, float(percent)))
+        self.progress_bar["value"] = p
+        self.update_idletasks()
+
+        total = self._progress_total_size or 0
+        elapsed = time.time() - self._progress_start_time
+        # processed bytes estimation
+        processed = (p / 100.0) * total
+
+        # speed (bytes/sec)
+        speed_bps = processed / elapsed if elapsed > 0 else 0.0
+        speed_kbps = speed_bps / 1024.0
+
+        # ETA seconds
+        remaining_bytes = max(0.0, total - processed)
+        eta_seconds = remaining_bytes / speed_bps if speed_bps > 0 else None
+
+        # format display
+        if speed_kbps > 0:
+            self.speed_label.config(text=f"Speed: {speed_kbps:0.2f} KB/s")
+        else:
+            self.speed_label.config(text="Speed: - KB/s")
+
+        if eta_seconds is None:
+            self.eta_label.config(text="ETA: --:--")
+        else:
+            # format mm:ss or hh:mm:ss if large
+            eta = int(eta_seconds)
+            h = eta // 3600
+            m = (eta % 3600) // 60
+            s = eta % 60
+            if h > 0:
+                self.eta_label.config(text=f"ETA: {h:d}:{m:02d}:{s:02d}")
+            else:
+                self.eta_label.config(text=f"ETA: {m:02d}:{s:02d}")
 
     # -------------------
     # TASKS WITH REAL PROGRESS
@@ -195,46 +273,47 @@ class HuffmanGUI(TkinterDnD.Tk):
         try:
             self.status_label.config(text="Compressing...")
             self.progress_bar["value"] = 0
+            self._start_progress_timer()
 
             def update_progress(value):
-                """Update bar during compression"""
-                self.progress_bar["value"] = value
-                self.update_idletasks()
+                # value expected 0..100 from main.compress
+                self._update_progress_ui(value)
 
             output_path = compress(file_path, progress_callback=update_progress)
+            # ensure progress shows complete
+            self._update_progress_ui(100.0)
             self.show_compression_info(file_path, output_path)
-            self.progress_bar["value"] = 100
             self.status_label.config(text="✅ Compression complete.")
         except Exception as e:
             self.status_label.config(text=f"Error: {e}")
             self.progress_bar["value"] = 0
+            self.speed_label.config(text="Speed: - KB/s")
+            self.eta_label.config(text="ETA: --:--")
 
     def decompress_file(self, file_path):
         """Decompress file with live progress tracking"""
         try:
             self.status_label.config(text="Decompressing...")
             self.progress_bar["value"] = 0
+            self._start_progress_timer()
 
             def update_progress(value):
-                """Update bar during decompression"""
-                self.progress_bar["value"] = value
-                self.update_idletasks()
+                self._update_progress_ui(value)
 
             output_path = decompress(file_path, progress_callback=update_progress)
-            self.result_text.config(
-                text=f"✅ Decompressed successfully!\nSaved to:\n{output_path}"
-            )
-            self.progress_bar["value"] = 100
+            self._update_progress_ui(100.0)
+            self.result_text.config(text=f"✅ Decompressed successfully!\nSaved to:\n{output_path}")
             self.status_label.config(text="✅ Decompression complete.")
         except Exception as e:
             self.status_label.config(text=f"Error: {e}")
             self.progress_bar["value"] = 0
+            self.speed_label.config(text="Speed: - KB/s")
+            self.eta_label.config(text="ETA: --:--")
 
     # -------------------
     # GRAPH + INFO DISPLAY
     # -------------------
     def show_compression_info(self, original_path, compressed_path):
-        """Display compression stats + store graph data"""
         original_size = os.path.getsize(original_path)
         compressed_size = os.path.getsize(compressed_path)
         ratio = (1 - compressed_size / original_size) * 100
@@ -259,8 +338,9 @@ class HuffmanGUI(TkinterDnD.Tk):
 
         if self.graph_canvas:
             self.graph_canvas.get_tk_widget().destroy()
+            self.graph_canvas = None
 
-        fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
+        fig, ax = plt.subplots(figsize=(5, 3.2), dpi=100)
         ax.bar(["Original", "Compressed"], [original_size, compressed_size],
                color=["#5B8BF7", "#F15A5A"])
         ax.set_ylabel("File Size (bytes)", color=colors["fg"])
@@ -276,7 +356,7 @@ class HuffmanGUI(TkinterDnD.Tk):
         self.graph_canvas.draw()
         widget = self.graph_canvas.get_tk_widget()
         widget.configure(bg=colors["bg"], highlightthickness=0)
-        widget.pack(pady=5)
+        widget.pack(pady=6)
 
     # -------------------
     # CLEAN EXIT
