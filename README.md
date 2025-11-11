@@ -102,7 +102,6 @@ This project implements Huffman Coding, a fundamental lossless data compression 
 
 📸 Screenshot
 
-Add your GUI screenshot here (e.g. screenshot.png):
 
 ![Huffman Compressor GUI](Screenshot.png)
 
